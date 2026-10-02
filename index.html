@@ -86,11 +86,18 @@ select{font:inherit;border-radius:8px;border:1px solid var(--line);background:va
   </div>
 
   <section class="card">
-    <div class="eyebrow" data-i18n="target"></div>
+    <div class="target-row">
+      <div class="eyebrow" data-i18n="target"></div>
+      <div class="lang" role="group" id="lyricRow" hidden>
+        <button type="button" id="lyrWords" class="on" data-i18n="lyrWords"></button><button type="button" id="lyrNames" data-i18n="lyrNames"></button>
+      </div>
+    </div>
     <div class="target-row">
       <div class="target-note" id="targetNote"></div>
       <div class="controls">
         <button id="playBtn" type="button" data-i18n="play"></button>
+        <button id="playSongBtn" type="button" class="primary" hidden data-i18n="playSong"></button>
+        <button id="playVoiceBtn" type="button" class="primary" hidden data-i18n="playVoice"></button>
         <button id="randBtn" type="button" data-i18n="next"></button>
       </div>
     </div>
@@ -107,6 +114,7 @@ select{font:inherit;border-radius:8px;border:1px solid var(--line);background:va
       <label class="hint" for="songSel" data-i18n="song"></label>
       <select id="songSel"></select>
     </div>
+
   </section>
 
   <section class="card gauge">
@@ -143,7 +151,7 @@ select{font:inherit;border-radius:8px;border:1px solid var(--line);background:va
   <section class="log">
     <div class="eyebrow" data-i18n="last"></div>
     <table><tbody id="logBody"></tbody></table>
-    <p class="hint"><span>v8 · </span><span data-i18n="hint"></span></p>
+    <p class="hint"><span>v18 · </span><span data-i18n="hint"></span></p>
   </section>
 </div>
 
@@ -156,14 +164,14 @@ const T={
       oct4:"First octave (C4–B4)",oct3:"Small octave (C3–B3)",oct5:"Second octave (C5–B5)",
       yes:"Yes — that's {n}",wrong:"That's {s} — {k} semitone{p} too {d}",low:"low",high:"high",listening:"Listening…",stopped:"Stopped",
       ok:"✓ correct",sang:"✗ sang {s}",micErr:"Microphone unavailable: {e}. Open in Chrome or Safari and allow microphone access.",
-      modeNotes:"Notes",modeSongs:"Songs",song:"Song",restart:"From the top",songDone:"Whole song — well done!"},
+      modeNotes:"Notes",modeSongs:"Songs",song:"Song",restart:"From the top",songDone:"Whole song — well done!",playSong:"▶ Melody",playing:"Listen…",stopPlay:"■ Stop",playVoice:"▶ With the words",noVoice:"No recording for this song yet.",under:"Under the notes",lyrWords:"Lyrics",lyrNames:"Notes"},
   ru:{tagline:"Послушай ноту, посмотри на неё в нотах, спой.",target:"Задание",play:"▶ Послушать",next:"Другая",range:"Диапазон",
       you:"Ты",idle:"Нажми «Старт» и пой",start:"Включить микрофон",stop:"Стоп",attempts:"попыток",correct:"верно",streak:"подряд",
       last:"Последние попытки",hint:"Тяни ноту около секунды. Попал в нужную — тренажёр сам даст следующую.",
       oct4:"Первая октава (до¹–си¹)",oct3:"Малая октава (до–си)",oct5:"Вторая октава (до²–си²)",
       yes:"Да — это {n}",wrong:"Это {s} — на {k} {p} {d}",low:"ниже",high:"выше",listening:"Слушаю…",stopped:"Остановлено",
       ok:"✓ верно",sang:"✗ спел {s}",micErr:"Микрофон недоступен: {e}. Открой в Chrome или Safari и разреши доступ к микрофону.",
-      modeNotes:"Ноты",modeSongs:"Песенки",song:"Песенка",restart:"Сначала",songDone:"Вся песенка — молодец!"}
+      modeNotes:"Ноты",modeSongs:"Песенки",song:"Песенка",restart:"Сначала",songDone:"Вся песенка — молодец!",playSong:"▶ Мелодия",playing:"Слушай…",stopPlay:"■ Стоп",playVoice:"▶ Со словами",noVoice:"Для этой песенки запись ещё не загружена.",under:"Под нотами",lyrWords:"Текст",lyrNames:"Ноты"}
 };
 let lang="en"; try{lang=localStorage.getItem("lang")||"en"}catch(e){}
 const t=(k,v={})=>T[lang][k].replace(/\{(\w+)\}/g,(_,x)=>v[x]??"");
@@ -181,16 +189,19 @@ function midiName(m){
   return EN[pc]+oct;
 }
 const RANGES={oct4:[60,71],oct3:[48,59],oct5:[72,83]};
+const BPM=68, BEAT=60000/BPM;                       // quarter note length in ms
+const DUR={w:4*BEAT,h:2*BEAT,q:BEAT,e:BEAT/2};      // note durations
+const holdFor=d=>Math.max(180,DUR[d]*0.55);         // how long the singer must hold a note of this length
 
 // ---------- songs: right hand only, one voice. m = MIDI, d = duration (h half, q quarter, e eighth), w = syllable ----------
 // Starter set: Russian folk chants (попевки) from the 1st-grade solfeggio programme. Songs from the user's book are added here.
 const SONGS=[
   // "Белка" — словацкая народная песня, тема из вариаций В. Паутовой. Правая рука, 2/4, до мажор. Слоги добавим, когда будет текст.
-  {id:"belka",title:{ru:"Белка (словацкая народная)",en:"The Squirrel (Slovak folk song)"},notes:[
-    [60,"e",""],[64,"e",""],[60,"e",""],[64,"e",""],   [67,"e",""],[67,"e",""],[67,"e",""],[67,"e",""],
-    [67,"e",""],[65,"e",""],[64,"e",""],[65,"e",""],   [67,"q",""],[67,"q",""],
-    [60,"e",""],[64,"e",""],[60,"e",""],[64,"e",""],   [67,"e",""],[67,"e",""],[67,"e",""],[67,"e",""],
-    [60,"e",""],[60,"e",""],[62,"e",""],[62,"e",""],   [60,"q",""],[60,"q",""]]},
+  {id:"belka",title:{ru:"Белка (словацкая народная)",en:"The Squirrel (Slovak folk song)"},audio:"belka.m4a",offset:0.0,bpm:68,time:"2/4",beats:2,barsPerRow:4,notes:[
+    [60,"e","Бел-"],[64,"e","ка"],[60,"e","пе-"],[64,"e","ла"],   [67,"e","и"],[67,"e","пля-"],[67,"e","са-"],[67,"e","ла,"],
+    [67,"e","слов-"],[65,"e","но"],[64,"e","за-"],[65,"e","вод-"],   [67,"q","на-"],[67,"q","я,"],
+    [60,"e","все"],[64,"e","под-"],[60,"e","мёт-"],[64,"e","ки"],   [67,"e","от-"],[67,"e","топ-"],[67,"e","та-"],[67,"e","ла,"],
+    [60,"e","шла"],[60,"e","до-"],[62,"e","мой"],[62,"e","бо-"],   [60,"q","са-"],[60,"q","я."]]},
 ];
 
 // ---------- staff drawing ----------
@@ -200,42 +211,97 @@ function staffPos(m,bass){
   const pc=((m%12)+12)%12, oct=Math.floor(m/12)-1;
   return LETTER_STEP[pc]+7*oct-(bass?18:30); // 0 = bottom line (treble E4 / bass G2), +1 per space/line
 }
-// draws one system: notes = [{m,d,w,state}], state: "cur" | "done" | ""
-function systemSvg(notes,bass,width){
-  const S=10, y0=78, left=50, right=width-14;
-  const n=notes.length, gap=n>1?Math.min(34,(right-left)/(n-1)):0;
+// durations in quarter-note units
+const QU={w:4,h:2,q:1,e:0.5};
+// split a song into bars by its time signature (beats per bar in quarters)
+function toBars(song){
+  const per=song.beats||2, bars=[]; let cur=[],acc=0;
+  song.notes.forEach((n,i)=>{ cur.push({m:n[0],d:n[1],w:n[2],i}); acc+=QU[n[1]]; if(acc>=per-1e-6){bars.push(cur);cur=[];acc=0} });
+  if(cur.length) bars.push(cur);
+  return bars;
+}
+// draws one system (a row of bars). notes carry .state: "cur" | "done" | ""
+function systemSvg(bars,bass,width,opts={}){
+  const S=10, y0=78, barGap=14, headW=12;
+  let x=opts.first?74:50;                         // room for clef (+ time signature on the first system)
+  const totalNotes=bars.reduce((a,b)=>a+b.length,0);
+  const avail=width-14-x-barGap*bars.length;
+  const gap=Math.max(20,Math.min(36,avail/Math.max(1,totalNotes)));
   let s=`<svg viewBox="0 0 ${width} 125" aria-hidden="true">`;
   for(let i=0;i<5;i++) s+=`<line x1="10" y1="${y0-i*S}" x2="${width-10}" y2="${y0-i*S}" stroke="var(--fg)" stroke-width="1"/>`;
   s+=bass?`<text x="14" y="${y0-S*2.9}" font-size="38" fill="var(--fg)">𝄢</text>`
          :`<text x="12" y="${y0-S*1.05}" font-size="62" fill="var(--fg)">𝄞</text>`;
-  notes.forEach((nt,i)=>{
-    const x=left+i*gap, pos=staffPos(nt.m,bass), y=y0-pos*S/2, pc=((nt.m%12)+12)%12;
-    const col=nt.state==="cur"?"var(--accent)":nt.state==="done"?"var(--good)":"var(--fg)";
-    for(let p=-2;p>=pos;p-=2) s+=`<line x1="${x-11}" y1="${y0-p*S/2}" x2="${x+11}" y2="${y0-p*S/2}" stroke="var(--fg)"/>`;
-    for(let p=10;p<=pos;p+=2) s+=`<line x1="${x-11}" y1="${y0-p*S/2}" x2="${x+11}" y2="${y0-p*S/2}" stroke="var(--fg)"/>`;
-    if(IS_SHARP[pc]) s+=`<text x="${x-20}" y="${y+5}" font-size="18" fill="${col}">♯</text>`;
-    if(nt.state==="cur") s+=`<circle cx="${x}" cy="${y}" r="11" fill="var(--accent)" opacity=".15"/>`;
-    const hollow=nt.d==="h"||nt.d==="w";
-    s+=`<ellipse cx="${x}" cy="${y}" rx="6" ry="4.3" transform="rotate(-20 ${x} ${y})" fill="${hollow?"none":col}" stroke="${col}" stroke-width="1.6"/>`;
-    if(nt.d!=="w"){
-      const up=pos<4, sx=up?x+5.6:x-5.6, sy=up?y-30:y+30;
-      s+=`<line x1="${sx}" y1="${y}" x2="${sx}" y2="${sy}" stroke="${col}" stroke-width="1.5"/>`;
-      if(nt.d==="e") s+=`<path d="M${sx} ${sy} q 2 ${up?8:-8} 8 ${up?12:-12}" fill="none" stroke="${col}" stroke-width="1.8"/>`;
-    }
-    if(nt.w) s+=`<text x="${x}" y="${y0+36}" font-size="9.5" text-anchor="middle" fill="${nt.state==="cur"?"var(--accent)":"var(--muted)"}" font-family="IBM Plex Sans, sans-serif">${nt.w}</text>`;
+  if(opts.first&&opts.time){ const [a,b]=opts.time.split("/"); s+=`<text x="52" y="${y0-S*2.2}" font-size="19" font-weight="700" text-anchor="middle" fill="var(--fg)" font-family="Fraunces, serif">${a}</text><text x="52" y="${y0-S*0.2}" font-size="19" font-weight="700" text-anchor="middle" fill="var(--fg)" font-family="Fraunces, serif">${b}</text>`; }
+  s+=`<line x1="10" y1="${y0-4*S}" x2="10" y2="${y0}" stroke="var(--fg)"/>`;
+  const col=nt=>nt.state==="cur"?"var(--accent)":nt.state==="done"?"var(--good)":"var(--fg)";
+  bars.forEach((bar,bi)=>{
+    // positions
+    bar.forEach(nt=>{ nt.x=x+gap/2; x+=gap; });
+    // beam groups: consecutive eighths inside one quarter beat
+    const groups=[]; let g=[],beat=0;
+    bar.forEach(nt=>{
+      const startBeat=Math.floor(beat+1e-6);
+      if(nt.d==="e"&&(g.length===0||Math.floor(g[0].beat+1e-6)===startBeat)){ nt.beat=beat; g.push(nt); }
+      else { if(g.length) groups.push(g); g=[]; if(nt.d==="e"){nt.beat=beat;g.push(nt)} }
+      beat+=QU[nt.d];
+    });
+    if(g.length) groups.push(g);
+    const beamed=new Set(groups.filter(gr=>gr.length>1).flat());
+    // heads, ledgers, accidentals, lyrics
+    bar.forEach(nt=>{
+      const pos=staffPos(nt.m,bass), y=y0-pos*S/2, pc=((nt.m%12)+12)%12; nt.y=y; nt.pos=pos;
+      for(let p=-2;p>=pos;p-=2) s+=`<line x1="${nt.x-10}" y1="${y0-p*S/2}" x2="${nt.x+10}" y2="${y0-p*S/2}" stroke="var(--fg)"/>`;
+      for(let p=10;p<=pos;p+=2) s+=`<line x1="${nt.x-10}" y1="${y0-p*S/2}" x2="${nt.x+10}" y2="${y0-p*S/2}" stroke="var(--fg)"/>`;
+      if(IS_SHARP[pc]) s+=`<text x="${nt.x-19}" y="${y+5}" font-size="18" fill="${col(nt)}">♯</text>`;
+      if(nt.state==="cur") s+=`<circle cx="${nt.x}" cy="${y}" r="11" fill="var(--accent)" opacity=".15"/>`;
+      const hollow=nt.d==="h"||nt.d==="w";
+      s+=`<ellipse cx="${nt.x}" cy="${y}" rx="5.8" ry="4.2" transform="rotate(-20 ${nt.x} ${y})" fill="${hollow?"none":col(nt)}" stroke="${col(nt)}" stroke-width="1.6"/>`;
+      const label=lyrics==="names"&&mode==="songs"?plainName(nt.m):nt.w;
+      if(label){
+        const cont=label.endsWith("-"), word=cont?label.slice(0,-1):label;
+        const fs=word.length>3?6.8:9;
+        const cur=nt.state==="cur";
+        s+=`<text x="${nt.x}" y="${y0+36}" font-size="${cur?fs*1.15:fs}" font-weight="${cur?700:400}" text-anchor="middle" fill="${cur?"var(--accent)":"var(--muted)"}" font-family="IBM Plex Sans, sans-serif">${word}</text>`;
+        if(cont){ const all=bars.flat(), k=all.indexOf(nt), nx=k+1<all.length?all[k+1].x:null; const hx=nx!=null?(nt.x+nx)/2:nt.x+gap/2+barGap/2;
+          s+=`<text x="${hx}" y="${y0+36}" font-size="9" text-anchor="middle" fill="var(--muted)" font-family="IBM Plex Sans, sans-serif">-</text>`; }
+      }
+    });
+    // stems: single notes
+    bar.forEach(nt=>{
+      if(nt.d==="w"||beamed.has(nt)) return;
+      const up=nt.pos<4, sx=up?nt.x+5.4:nt.x-5.4, sy=up?nt.y-30:nt.y+30, c=col(nt);
+      s+=`<line x1="${sx}" y1="${nt.y}" x2="${sx}" y2="${sy}" stroke="${c}" stroke-width="1.5"/>`;
+      if(nt.d==="e") s+=`<path d="M${sx} ${sy} q 2 ${up?8:-8} 8 ${up?12:-12}" fill="none" stroke="${c}" stroke-width="1.8"/>`;
+    });
+    // beamed groups: common stem direction, one straight beam
+    groups.filter(gr=>gr.length>1).forEach(gr=>{
+      const avg=gr.reduce((a,n)=>a+n.pos,0)/gr.length, up=avg<4;
+      const tip=up?Math.min(...gr.map(n=>n.y))-30:Math.max(...gr.map(n=>n.y))+30;
+      const c=gr.some(n=>n.state==="cur")?"var(--accent)":gr.every(n=>n.state==="done")?"var(--good)":"var(--fg)";
+      gr.forEach(n=>{ const sx=up?n.x+5.4:n.x-5.4; s+=`<line x1="${sx}" y1="${n.y}" x2="${sx}" y2="${tip}" stroke="${col(n)}" stroke-width="1.5"/>`; });
+      const x1=up?gr[0].x+5.4:gr[0].x-5.4, x2=up?gr[gr.length-1].x+5.4:gr[gr.length-1].x-5.4;
+      s+=`<line x1="${x1}" y1="${tip}" x2="${x2}" y2="${tip}" stroke="${c}" stroke-width="3.6"/>`;
+    });
+    // bar line
+    x+=barGap/2;
+    const last=bi===bars.length-1&&opts.end;
+    s+=last?`<line x1="${x-3}" y1="${y0-4*S}" x2="${x-3}" y2="${y0}" stroke="var(--fg)"/><line x1="${x+1}" y1="${y0-4*S}" x2="${x+1}" y2="${y0}" stroke="var(--fg)" stroke-width="3"/>`
+           :`<line x1="${x}" y1="${y0-4*S}" x2="${x}" y2="${y0}" stroke="var(--fg)"/>`;
+    x+=barGap/2;
   });
   return s+`</svg>`;
 }
 function drawStaff(){
   if(mode==="notes"){
-    $("staff").innerHTML=systemSvg([{m:target,d:"q",w:"",state:"cur"}],target<60,220).replace('viewBox="0 0 220 125"','viewBox="0 0 220 110"');
+    $("staff").innerHTML=systemSvg([[{m:target,d:"q",w:"",state:"cur"}]],target<60,220).replace('viewBox="0 0 220 125"','viewBox="0 0 220 110"');
     return;
   }
-  const song=SONGS[songIdx], per=14, bass=Math.min(...song.notes.map(n=>n[0]))<57;
+  const song=SONGS[songIdx], bass=Math.min(...song.notes.map(n=>n[0]))<57;
+  const bars=toBars(song), perRow=song.barsPerRow||4;
+  bars.forEach(b=>b.forEach(nt=>{nt.state=nt.i===songPos?"cur":nt.i<songPos?"done":""}));
   let html="";
-  for(let i=0;i<song.notes.length;i+=per){
-    const chunk=song.notes.slice(i,i+per).map((n,j)=>({m:n[0],d:n[1],w:n[2],state:i+j===songPos?"cur":i+j<songPos?"done":""}));
-    html+=systemSvg(chunk,bass,380);
+  for(let i=0;i<bars.length;i+=perRow){
+    html+=systemSvg(bars.slice(i,i+perRow),bass,400,{first:i===0,time:song.time,end:i+perRow>=bars.length});
   }
   $("staff").innerHTML=html;
 }
@@ -243,7 +309,7 @@ function drawStaff(){
 // ---------- state ----------
 let target=60, audioCtx=null, analyser=null, stream=null, raf=null, buf=null, attempts=[];
 let holdStart=0, holdNote=null, locked=false;
-let mode="notes", songIdx=0, songPos=0;
+let mode="notes", songIdx=0, songPos=0, lyrics="words";
 const $=id=>document.getElementById(id);
 
 function applyLang(){
@@ -261,11 +327,14 @@ $("langRu").onclick=()=>{lang="ru";try{localStorage.setItem("lang",lang)}catch(e
 function setMode(m){
   mode=m;
   $("tabNotes").classList.toggle("on",m==="notes"); $("tabSongs").classList.toggle("on",m==="songs");
-  $("rangeRow").hidden=m!=="notes"; $("songRow").hidden=m!=="songs";
+  $("rangeRow").hidden=m!=="notes"; $("songRow").hidden=m!=="songs"; $("playSongBtn").hidden=m!=="songs"; $("playVoiceBtn").hidden=m!=="songs"||!SONGS[songIdx].audio; $("playBtn").hidden=m==="songs"; $("lyricRow").hidden=m!=="songs";
   $("randBtn").textContent=t(m==="notes"?"next":"restart");
   if(m==="songs"){songPos=0;setTarget(SONGS[songIdx].notes[0][0]);} else randomTarget();
 }
 $("tabNotes").onclick=()=>setMode("notes"); $("tabSongs").onclick=()=>setMode("songs");
+function setLyrics(v){ lyrics=v; $("lyrWords").classList.toggle("on",v==="words"); $("lyrNames").classList.toggle("on",v==="names"); drawStaff(); }
+$("lyrWords").onclick=()=>setLyrics("words"); $("lyrNames").onclick=()=>setLyrics("names");
+const plainName=m=>lang==="ru"?RU[((m%12)+12)%12]:EN[((m%12)+12)%12];
 $("songSel").onchange=e=>{songIdx=+e.target.value;songPos=0;setTarget(SONGS[songIdx].notes[0][0]);playTarget()};
 
 function setTarget(m){
@@ -297,13 +366,68 @@ function ensureCtx(){ if(!audioCtx) audioCtx=new (window.AudioContext||window.we
 function playTarget(){
   ensureCtx();
   const o=audioCtx.createOscillator(), g=audioCtx.createGain();
-  o.type="triangle"; o.frequency.value=midiToHz(target);
+  o.type="sine"; o.frequency.value=midiToHz(target);
   const now=audioCtx.currentTime;
-  g.gain.setValueAtTime(0,now); g.gain.linearRampToValueAtTime(.35,now+.02); g.gain.exponentialRampToValueAtTime(.001,now+1.4);
+  g.gain.setValueAtTime(0,now); g.gain.linearRampToValueAtTime(.45,now+.02); g.gain.exponentialRampToValueAtTime(.001,now+1.4);
   o.connect(g).connect(audioCtx.destination); o.start(); o.stop(now+1.5);
   locked=true; setTimeout(()=>{locked=false},1500); // don't judge while the reference tone plays
 }
 $("playBtn").onclick=playTarget;
+
+// play the whole song in tempo; the staff highlights the sounding note and its syllable
+let songTimer=null, playingSong=false, songOsc=[], songTicks=[];
+function tone(m,ms,at){
+  const sec=ms/1000, g=audioCtx.createGain();
+  g.gain.setValueAtTime(0,at); g.gain.linearRampToValueAtTime(.4,at+.02);
+  g.gain.setValueAtTime(.4,at+sec*0.6); g.gain.exponentialRampToValueAtTime(.001,at+sec*0.9); // short gap before the next note
+  g.connect(audioCtx.destination);
+  const o=audioCtx.createOscillator(); o.type="sine"; o.frequency.value=midiToHz(m);
+  const o2=audioCtx.createOscillator(), g2=audioCtx.createGain(); o2.type="sine"; o2.frequency.value=midiToHz(m+12); g2.gain.value=.18; // soft octave sparkle
+  o.connect(g); o2.connect(g2).connect(g);
+  o.start(at); o.stop(at+sec); o2.start(at); o2.stop(at+sec); songOsc.push(o,o2);
+}
+function playSong(){
+  if(playingSong){stopSong();return}
+  ensureCtx(); playingSong=true; locked=true;
+  $("playSongBtn").textContent=t("stopPlay");
+  verdict.textContent=t("playing"); verdict.className="verdict";
+  const song=SONGS[songIdx]; let at=audioCtx.currentTime+0.05, elapsed=50;
+  const saved=songPos;
+  song.notes.forEach((n,i)=>{
+    const ms=DUR[n[1]];
+    tone(n[0],ms,at); at+=ms/1000;
+    songTicks.push(setTimeout(()=>{ if(!playingSong) return; songPos=i; drawStaff(); },elapsed)); elapsed+=ms;
+  });
+  songTimer=setTimeout(()=>{ playingSong=false; songOsc=[]; songTicks=[]; songPos=saved; setTarget(song.notes[songPos][0]); $("playSongBtn").textContent=t("playSong"); verdict.textContent=""; locked=false; },elapsed+200);
+}
+function stopSong(){
+  clearTimeout(songTimer); songTicks.forEach(clearTimeout); songTicks=[]; playingSong=false;
+  songOsc.forEach(o=>{try{o.stop()}catch(e){}}); songOsc=[];
+  $("playSongBtn").textContent=t("playSong"); verdict.textContent=""; locked=false;
+  drawStaff();
+}
+$("playSongBtn").onclick=playSong;
+
+// recorded voice: plays the song's audio file and moves the highlight by the recording's clock
+let voice=null, voiceRaf=null;
+function playVoice(){
+  if(voice){stopVoice();return}
+  const song=SONGS[songIdx]; if(!song.audio) return;
+  const beat=60/(song.bpm||BPM), len={w:4*beat,h:2*beat,q:beat,e:beat/2};
+  const starts=[]; let acc=song.offset||0; song.notes.forEach(n=>{starts.push(acc); acc+=len[n[1]];});
+  voice=new Audio(song.audio); locked=true; const saved=songPos;
+  $("playVoiceBtn").textContent=t("stopPlay"); verdict.textContent=t("playing"); verdict.className="verdict";
+  voice.onerror=()=>{ stopVoice(); $("err").textContent=t("noVoice"); };
+  voice.onended=()=>{ stopVoice(); songPos=saved; setTarget(song.notes[songPos][0]); };
+  voice.play().catch(()=>{ stopVoice(); $("err").textContent=t("noVoice"); });
+  const step=()=>{ if(!voice) return; const tt=voice.currentTime; let i=0; while(i+1<starts.length&&starts[i+1]<=tt) i++; if(tt>=starts[0]&&i!==songPos){songPos=i;drawStaff();} voiceRaf=requestAnimationFrame(step); };
+  step();
+}
+function stopVoice(){
+  cancelAnimationFrame(voiceRaf); if(voice){voice.pause();voice=null}
+  $("playVoiceBtn").textContent=t("playVoice"); verdict.textContent=""; locked=false; drawStaff();
+}
+$("playVoiceBtn").onclick=()=>{ $("err").textContent=""; playVoice(); };
 
 // ---------- pitch detection (autocorrelation, McLeod-style) ----------
 function detectPitch(b,sr){
@@ -358,7 +482,7 @@ function tick(){
     else{const k=Math.abs(diff);verdict.textContent=t("wrong",{s:midiName(nearest),k,p:lang==="ru"?ruPlural(k):(k===1?"":"s"),d:t(diff<0?"low":"high")});verdict.className="verdict bad"}
     if(nearest!==holdNote){holdNote=nearest;holdStart=now}
     const held=now-holdStart;
-    const need=mode==="songs"?HOLD_SONG_MS:HOLD_MS; $("hold").style.width=Math.min(100,100*held/need)+"%";
+    const need=mode==="songs"?holdFor(SONGS[songIdx].notes[Math.min(songPos,SONGS[songIdx].notes.length-1)][1]):HOLD_MS; $("hold").style.width=Math.min(100,100*held/need)+"%";
     $("hold").style.background=diff===0?"var(--good)":"var(--bad)";
     if(held>=need){
       record(nearest);
