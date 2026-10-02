@@ -6,185 +6,242 @@
 <title>Pitch Trainer</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
-/* Layout: one tall column — target note on top, live gauge in the middle, note log below. Tuner-meets-practice-room. */
+/* Layout: one tall column — target note on a staff, live judge, log. Tuner-meets-practice-room. */
 :root{
-  --bg:#f6f3ec;        /* warm paper */
-  --fg:#1d1a16;
-  --muted:#6f6a60;
-  --line:#dcd6ca;
-  --card:#fffdf8;
-  --accent:#b8481c;    /* burnt copper, like piano hammers' felt-and-wood */
-  --good:#2f7d4f;
-  --warn:#c98a1b;
-  --bad:#b23a3a;
-  --display:"Fraunces",Georgia,serif;
-  --body:"IBM Plex Sans",system-ui,sans-serif;
-  --mono:"IBM Plex Mono",ui-monospace,monospace;
+  --bg:#f6f3ec;--fg:#1d1a16;--muted:#6f6a60;--line:#dcd6ca;--card:#fffdf8;
+  --accent:#b8481c;--good:#2f7d4f;--bad:#b23a3a;
+  --display:"Fraunces",Georgia,serif;--body:"IBM Plex Sans",system-ui,sans-serif;--mono:"IBM Plex Mono",ui-monospace,monospace;
 }
 @media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){
-    --bg:#15130f;--fg:#efe9dc;--muted:#a39b8c;--line:#312c24;--card:#1e1b16;
-    --accent:#e2764a;--good:#5db37d;--warn:#e0a63d;--bad:#e06464;color-scheme:dark
-  }
+  :root:not([data-theme="light"]){--bg:#15130f;--fg:#efe9dc;--muted:#a39b8c;--line:#312c24;--card:#1e1b16;--accent:#e2764a;--good:#5db37d;--bad:#e06464;color-scheme:dark}
 }
-:root[data-theme="dark"]{
-  --bg:#15130f;--fg:#efe9dc;--muted:#a39b8c;--line:#312c24;--card:#1e1b16;
-  --accent:#e2764a;--good:#5db37d;--warn:#e0a63d;--bad:#e06464;color-scheme:dark
-}
+:root[data-theme="dark"]{--bg:#15130f;--fg:#efe9dc;--muted:#a39b8c;--line:#312c24;--card:#1e1b16;--accent:#e2764a;--good:#5db37d;--bad:#e06464;color-scheme:dark}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.5}
-.wrap{max-width:560px;margin:0 auto;padding-block:28px 48px;padding-inline:16px;display:flex;flex-direction:column;gap:22px}
-header h1{font-family:var(--display);font-weight:700;font-size:2rem;margin:0;letter-spacing:-.01em;text-wrap:balance}
-header p{margin:4px 0 0;color:var(--muted)}
+.wrap{max-width:560px;margin:0 auto;padding-block:20px 48px;padding-inline:16px;display:flex;flex-direction:column;gap:18px}
+header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+header h1{font-family:var(--display);font-weight:700;font-size:1.9rem;margin:0;letter-spacing:-.01em}
+header p{margin:2px 0 0;color:var(--muted);font-size:.95rem}
+.lang{display:flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;flex-shrink:0}
+.lang button{border:0;border-radius:0;padding:6px 12px;font-size:.85rem}
+.lang button.on{background:var(--fg);color:var(--bg)}
 .eyebrow{font-size:.72rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);font-weight:600}
-
-.target{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px}
 .target-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-.target-note{font-family:var(--display);font-size:3rem;font-weight:500;line-height:1}
-.target-note small{font-size:1rem;color:var(--muted);font-family:var(--mono);margin-left:8px}
+.target-note{font-family:var(--display);font-size:2.8rem;font-weight:500;line-height:1}
+.target-note small{font-size:.95rem;color:var(--muted);font-family:var(--mono);margin-left:8px}
+.staff{width:100%;max-width:100%}
+.staff svg{width:100%;height:auto;display:block;overflow:visible}
 .controls{display:flex;gap:8px;flex-wrap:wrap}
 button{font:inherit;font-weight:600;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--fg);padding:9px 16px;cursor:pointer}
 button:hover{border-color:var(--fg)}
 button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
-button.primary:hover{filter:brightness(1.08)}
 button[disabled]{opacity:.5;cursor:default}
-select{font:inherit;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg);padding:8px 10px}
-
-.gauge{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 16px 16px;display:flex;flex-direction:column;align-items:center;gap:8px}
-.heard{font-family:var(--display);font-size:4.5rem;font-weight:700;line-height:1;min-height:1em;font-variant-numeric:tabular-nums}
-.heard.idle{color:var(--muted);font-size:1.4rem;font-weight:500;font-family:var(--body)}
-.hz{font-family:var(--mono);color:var(--muted);font-size:.9rem;min-height:1.4em}
-.meter{width:100%;max-width:100%;margin-top:6px}
+select{font:inherit;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg);padding:8px 10px;max-width:100%}
+.gauge{align-items:center;padding-top:20px}
+.heard{font-family:var(--display);font-size:4rem;font-weight:700;line-height:1;min-height:1em}
+.heard.idle{color:var(--muted);font-size:1.3rem;font-weight:500;font-family:var(--body)}
+.meter{width:100%}
 .meter svg{width:100%;height:auto;display:block;overflow:visible}
 .verdict{font-weight:600;min-height:1.5em;text-align:center}
-.levelbar{width:60%;max-width:100%;height:4px;background:var(--line);border-radius:2px;overflow:hidden}
-.levelbar div{height:100%;width:0;background:var(--accent);transition:width .05s linear}
-.verdict.good{color:var(--good)}.verdict.warn{color:var(--warn)}.verdict.bad{color:var(--bad)}
-
+.verdict.good{color:var(--good)}.verdict.bad{color:var(--bad)}
+.progress{width:60%;height:4px;background:var(--line);border-radius:2px;overflow:hidden}
+.progress div{height:100%;width:0;background:var(--good)}
+.levelbar{width:60%;height:3px;background:var(--line);border-radius:2px;overflow:hidden}
+.levelbar div{height:100%;width:0;background:var(--accent)}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-width:0}
 .stat b{display:block;font-family:var(--mono);font-size:1.3rem;font-weight:500;font-variant-numeric:tabular-nums}
 .stat span{font-size:.75rem;color:var(--muted)}
-
 .log{display:flex;flex-direction:column;gap:6px}
-.log table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:.88rem;font-variant-numeric:tabular-nums}
+.log table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:.88rem}
 .log td{padding:6px 4px;border-bottom:1px solid var(--line)}
-.log td:last-child{text-align:right}
-.log .c-good{color:var(--good)}.log .c-warn{color:var(--warn)}.log .c-bad{color:var(--bad)}
+.c-good{color:var(--good)}.c-bad{color:var(--bad)}
 .hint{font-size:.85rem;color:var(--muted)}
 .err{color:var(--bad);font-weight:500}
-@media (max-width:420px){.target-note{font-size:2.4rem}.heard{font-size:3.6rem}}
+@media (max-width:420px){.target-note{font-size:2.2rem}.heard{font-size:3.2rem}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <h1>Pitch Trainer</h1>
-    <p>Pick a note, hear it, sing it back. The trainer tells you whether you hit the right note.</p>
+    <div>
+      <h1>Pitch Trainer</h1>
+      <p data-i18n="tagline"></p>
+    </div>
+    <div class="lang" role="group" aria-label="Language">
+      <button type="button" id="langEn">EN</button><button type="button" id="langRu">RU</button>
+    </div>
   </header>
 
-  <section class="target">
-    <div class="eyebrow">Target</div>
+  <section class="card">
+    <div class="eyebrow" data-i18n="target"></div>
     <div class="target-row">
-      <div class="target-note" id="targetNote">A4 <small id="targetHz">440.0 Hz</small></div>
+      <div class="target-note" id="targetNote"></div>
       <div class="controls">
-        <button id="playBtn" type="button">▶ Play</button>
-        <button id="randBtn" type="button">Random</button>
+        <button id="playBtn" type="button" data-i18n="play"></button>
+        <button id="randBtn" type="button" data-i18n="next"></button>
       </div>
     </div>
+    <div class="staff" id="staff"></div>
     <div class="target-row">
-      <label class="hint" for="rangeSel">Range</label>
+      <label class="hint" for="rangeSel" data-i18n="range"></label>
       <select id="rangeSel">
-        <option value="oct4" selected>Octave 4 (C4–B4)</option>
-        <option value="oct3">Octave 3 (C3–B3)</option>
-        <option value="oct5">Octave 5 (C5–B5)</option>
-        <option value="mid">Two octaves (C3–C5)</option>
+        <option value="oct4" selected></option>
+        <option value="oct3"></option>
+        <option value="oct5"></option>
       </select>
     </div>
   </section>
 
-  <section class="gauge">
-    <div class="eyebrow">You</div>
-    <div class="heard idle" id="heard">Press Start and sing</div>
-    <div class="hz" id="heardHz"></div>
+  <section class="card gauge">
+    <div class="eyebrow" data-i18n="you"></div>
+    <div class="heard idle" id="heard"></div>
     <div class="meter">
-      <svg viewBox="-110 -8 220 56" aria-label="Cents deviation meter">
+      <svg viewBox="-110 -8 220 56" aria-hidden="true">
         <line x1="-100" y1="20" x2="100" y2="20" stroke="var(--line)" stroke-width="2"/>
-        <g font-family="IBM Plex Mono, monospace" font-size="8" fill="var(--muted)" text-anchor="middle">
-          <line x1="-100" y1="14" x2="-100" y2="26" stroke="var(--muted)" stroke-width="1"/><text x="-100" y="40" id="lblLow">B3</text>
-          <line x1="0" y1="10" x2="0" y2="30" stroke="var(--fg)" stroke-width="1.5"/><text x="0" y="40" fill="var(--fg)" id="lblMid">C4</text>
-          <line x1="100" y1="14" x2="100" y2="26" stroke="var(--muted)" stroke-width="1"/><text x="100" y="40" id="lblHigh">C♯4</text>
-        </g>
         <rect x="-50" y="17" width="100" height="6" fill="var(--good)" opacity=".25"/>
+        <g font-family="IBM Plex Mono, monospace" font-size="8" fill="var(--muted)" text-anchor="middle">
+          <line x1="-100" y1="14" x2="-100" y2="26" stroke="var(--muted)"/><text x="-100" y="40" id="lblLow"></text>
+          <line x1="0" y1="10" x2="0" y2="30" stroke="var(--fg)" stroke-width="1.5"/><text x="0" y="40" fill="var(--fg)" id="lblMid"></text>
+          <line x1="100" y1="14" x2="100" y2="26" stroke="var(--muted)"/><text x="100" y="40" id="lblHigh"></text>
+        </g>
         <polygon id="needle" points="0,2 -5,-6 5,-6" fill="var(--accent)" style="transition:transform .08s linear"/>
       </svg>
     </div>
     <div class="verdict" id="verdict"></div>
-    <div class="levelbar" title="Microphone level"><div id="level"></div></div>
+    <div class="progress" title="hold"><div id="hold"></div></div>
+    <div class="levelbar"><div id="level"></div></div>
     <div class="controls">
-      <button class="primary" id="startBtn" type="button">Start microphone</button>
-      <button id="stopBtn" type="button" disabled>Stop</button>
+      <button class="primary" id="startBtn" type="button" data-i18n="start"></button>
+      <button id="stopBtn" type="button" disabled data-i18n="stop"></button>
     </div>
     <div class="hint err" id="err"></div>
   </section>
 
   <section class="stats">
-    <div class="stat"><b id="stAttempts">0</b><span>attempts</span></div>
-    <div class="stat"><b id="stHit">—</b><span>correct</span></div>
-    <div class="stat"><b id="stAvg">—</b><span>streak</span></div>
+    <div class="stat"><b id="stAttempts">0</b><span data-i18n="attempts"></span></div>
+    <div class="stat"><b id="stHit">—</b><span data-i18n="correct"></span></div>
+    <div class="stat"><b id="stStreak">—</b><span data-i18n="streak"></span></div>
   </section>
 
   <section class="log">
-    <div class="eyebrow">Last attempts</div>
+    <div class="eyebrow" data-i18n="last"></div>
     <table><tbody id="logBody"></tbody></table>
-    <p class="hint">v5 · Hold each note for about a second. You pass if the note you hold is the right one — anywhere inside the green zone counts. Fine tuning comes later.</p>
+    <p class="hint"><span>v6 · </span><span data-i18n="hint"></span></p>
   </section>
 </div>
 
 <script>
+// ---------- i18n ----------
+const T={
+  en:{tagline:"Hear the note, see it on the staff, sing it back.",target:"Target",play:"▶ Play",next:"Next",range:"Range",
+      you:"You",idle:"Press Start and sing",start:"Start microphone",stop:"Stop",attempts:"attempts",correct:"correct",streak:"streak",
+      last:"Last attempts",hint:"Hold the note for about a second. Hit the right note and the trainer moves on to the next one.",
+      oct4:"First octave (C4–B4)",oct3:"Small octave (C3–B3)",oct5:"Second octave (C5–B5)",
+      yes:"Yes — that's {n}",wrong:"That's {s} — {k} semitone{p} too {d}",low:"low",high:"high",listening:"Listening…",stopped:"Stopped",
+      ok:"✓ correct",sang:"✗ sang {s}",micErr:"Microphone unavailable: {e}. Open in Chrome or Safari and allow microphone access."},
+  ru:{tagline:"Послушай ноту, посмотри на неё в нотах, спой.",target:"Задание",play:"▶ Послушать",next:"Другая",range:"Диапазон",
+      you:"Ты",idle:"Нажми «Старт» и пой",start:"Включить микрофон",stop:"Стоп",attempts:"попыток",correct:"верно",streak:"подряд",
+      last:"Последние попытки",hint:"Тяни ноту около секунды. Попал в нужную — тренажёр сам даст следующую.",
+      oct4:"Первая октава (до¹–си¹)",oct3:"Малая октава (до–си)",oct5:"Вторая октава (до²–си²)",
+      yes:"Да — это {n}",wrong:"Это {s} — на {k} {p} {d}",low:"ниже",high:"выше",listening:"Слушаю…",stopped:"Остановлено",
+      ok:"✓ верно",sang:"✗ спел {s}",micErr:"Микрофон недоступен: {e}. Открой в Chrome или Safari и разреши доступ к микрофону."}
+};
+let lang="en"; try{lang=localStorage.getItem("lang")||"en"}catch(e){}
+const t=(k,v={})=>T[lang][k].replace(/\{(\w+)\}/g,(_,x)=>v[x]??"");
+function ruPlural(k){return k===1?"полутон":k<5?"полутона":"полутонов"}
+
 // ---------- music helpers ----------
-const NAMES=["C","C♯","D","D♯","E","E♯","F♯","G","G♯","A","A♯","B"];
-NAMES[5]="F";
+const EN=["C","C♯","D","D♯","E","F","F♯","G","G♯","A","A♯","B"];
+const RU=["до","до♯","ре","ре♯","ми","фа","фа♯","соль","соль♯","ля","ля♯","си"];
+const RU_OCT={2:"",3:"",4:"¹",5:"²",6:"³"};
 function midiToHz(m){return 440*Math.pow(2,(m-69)/12)}
 function hzToMidi(f){return 69+12*Math.log2(f/440)}
-function midiName(m){return NAMES[((m%12)+12)%12]+(Math.floor(m/12)-1)}
-const RANGES={oct4:[60,71],oct3:[48,59],oct5:[72,83],mid:[48,72]};
+function midiName(m){
+  const pc=((m%12)+12)%12, oct=Math.floor(m/12)-1;
+  if(lang==="ru"){ let n=RU[pc]; if(oct===2) n=n[0].toUpperCase()+n.slice(1); return n+(RU_OCT[oct]??oct); }
+  return EN[pc]+oct;
+}
+const RANGES={oct4:[60,71],oct3:[48,59],oct5:[72,83]};
+
+// ---------- staff drawing ----------
+const LETTER_STEP=[0,0,1,1,2,3,3,4,4,5,5,6]; // pitch class -> diatonic letter (C D E F G A B)
+const IS_SHARP=[0,1,0,1,0,0,1,0,1,0,1,0];
+function drawStaff(m){
+  const bass=m<60;                       // small octave and below: bass clef
+  const pc=((m%12)+12)%12, oct=Math.floor(m/12)-1;
+  const step=LETTER_STEP[pc]+7*oct;      // diatonic step index
+  const bottom=bass?(4+7*2):(2+7*4);     // bass: G2 on bottom line; treble: E4
+  const pos=step-bottom;                 // 0 = bottom line, 1 = first space, ...
+  const S=10, y0=70, x=150;              // space height, bottom line y, note x
+  const y=y0-pos*S/2;
+  let s=`<svg viewBox="0 0 220 110" role="img" aria-label="${midiName(m)}">`;
+  for(let i=0;i<5;i++) s+=`<line x1="20" y1="${y0-i*S}" x2="200" y2="${y0-i*S}" stroke="var(--fg)" stroke-width="1"/>`;
+  // clef as a glyph
+  s+=bass
+    ?`<text x="26" y="${y0-S*2.9}" font-size="38" fill="var(--fg)">𝄢</text>`
+    :`<text x="24" y="${y0-S*1.05}" font-size="62" fill="var(--fg)">𝄞</text>`;
+  // ledger lines
+  for(let p=-2;p>=pos;p-=2) s+=`<line x1="${x-14}" y1="${y0-p*S/2}" x2="${x+14}" y2="${y0-p*S/2}" stroke="var(--fg)"/>`;
+  for(let p=10;p<=pos;p+=2) s+=`<line x1="${x-14}" y1="${y0-p*S/2}" x2="${x+14}" y2="${y0-p*S/2}" stroke="var(--fg)"/>`;
+  if(IS_SHARP[pc]) s+=`<text x="${x-26}" y="${y+5}" font-size="20" fill="var(--fg)">♯</text>`;
+  s+=`<ellipse cx="${x}" cy="${y}" rx="6.5" ry="4.6" transform="rotate(-20 ${x} ${y})" fill="var(--accent)"/>`;
+  const up=pos<4; // stem direction
+  s+=up?`<line x1="${x+6}" y1="${y}" x2="${x+6}" y2="${y-32}" stroke="var(--accent)" stroke-width="1.6"/>`
+       :`<line x1="${x-6}" y1="${y}" x2="${x-6}" y2="${y+32}" stroke="var(--accent)" stroke-width="1.6"/>`;
+  s+=`</svg>`;
+  $("staff").innerHTML=s;
+}
 
 // ---------- state ----------
-let target=69, audioCtx=null, analyser=null, stream=null, raf=null;
-let buf=null, attempts=[], cur=null; // cur: {start, cents:[]}
-
+let target=60, audioCtx=null, analyser=null, stream=null, raf=null, buf=null, attempts=[];
+let holdStart=0, holdNote=null, locked=false;
 const $=id=>document.getElementById(id);
+
+function applyLang(){
+  document.documentElement.lang=lang;
+  document.querySelectorAll("[data-i18n]").forEach(el=>el.textContent=t(el.dataset.i18n));
+  for(const k of ["oct4","oct3","oct5"]) document.querySelector(`option[value=${k}]`).textContent=t(k);
+  $("langEn").classList.toggle("on",lang==="en"); $("langRu").classList.toggle("on",lang==="ru");
+  if(!raf){ $("heard").textContent=t("idle"); }
+  setTarget(target); renderLog();
+}
+$("langEn").onclick=()=>{lang="en";try{localStorage.setItem("lang",lang)}catch(e){};applyLang()};
+$("langRu").onclick=()=>{lang="ru";try{localStorage.setItem("lang",lang)}catch(e){};applyLang()};
+
 function setTarget(m){
   target=m;
-  $("targetNote").innerHTML=`${midiName(m)} <small id="targetHz">${midiToHz(m).toFixed(1)} Hz</small>`;
+  $("targetNote").innerHTML=`${midiName(m)} <small>${midiToHz(m).toFixed(1)} Hz</small>`;
   $("lblLow").textContent=midiName(m-1); $("lblMid").textContent=midiName(m); $("lblHigh").textContent=midiName(m+1);
+  drawStaff(m);
 }
 function randomTarget(){
   const [lo,hi]=RANGES[$("rangeSel").value];
   let m; do{m=lo+Math.floor(Math.random()*(hi-lo+1))}while(m===target);
   setTarget(m);
 }
-$("randBtn").onclick=randomTarget;
+$("randBtn").onclick=()=>{randomTarget();playTarget()};
 $("rangeSel").onchange=randomTarget;
 
 function ensureCtx(){ if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state==="suspended") audioCtx.resume(); }
-$("playBtn").onclick=()=>{
+function playTarget(){
   ensureCtx();
   const o=audioCtx.createOscillator(), g=audioCtx.createGain();
   o.type="triangle"; o.frequency.value=midiToHz(target);
-  g.gain.setValueAtTime(0,audioCtx.currentTime);
-  g.gain.linearRampToValueAtTime(.35,audioCtx.currentTime+.02);
-  g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+1.4);
-  o.connect(g).connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+1.5);
-};
+  const now=audioCtx.currentTime;
+  g.gain.setValueAtTime(0,now); g.gain.linearRampToValueAtTime(.35,now+.02); g.gain.exponentialRampToValueAtTime(.001,now+1.4);
+  o.connect(g).connect(audioCtx.destination); o.start(); o.stop(now+1.5);
+  locked=true; setTimeout(()=>{locked=false},1500); // don't judge while the reference tone plays
+}
+$("playBtn").onclick=playTarget;
 
-// ---------- pitch detection (autocorrelation, McLeod-style normalisation) ----------
+// ---------- pitch detection (autocorrelation, McLeod-style) ----------
 function detectPitch(b,sr){
   let rms=0; for(let i=0;i<b.length;i++) rms+=b[i]*b[i]; rms=Math.sqrt(rms/b.length);
-  if(rms<0.0015) return -1; // silence (very low threshold: phone mics with AGC off are quiet)
+  if(rms<0.0015) return -1;
   const N=b.length, maxLag=Math.floor(sr/60), minLag=Math.floor(sr/1200);
   const nsdf=new Float32Array(maxLag);
   for(let lag=minLag;lag<maxLag;lag++){
@@ -192,94 +249,75 @@ function detectPitch(b,sr){
     for(let i=0;i<N-lag;i++){acf+=b[i]*b[i+lag]; m+=b[i]*b[i]+b[i+lag]*b[i+lag];}
     nsdf[lag]=m>0?2*acf/m:0;
   }
-  // find first major peak after first negative zero crossing
   let i=minLag; while(i<maxLag&&nsdf[i]>0)i++;
-  let best=-1,bestV=0;
-  const peaks=[];
+  let best=-1,bestV=0; const peaks=[];
   while(i<maxLag-1){
     if(nsdf[i]>nsdf[i-1]&&nsdf[i]>=nsdf[i+1]&&nsdf[i]>0){peaks.push(i); if(nsdf[i]>bestV){bestV=nsdf[i];best=i}}
     i++;
   }
-  if(best<0||bestV<0.55) return -1; // clarity: 0.55 accepts breathy / quiet singing, was 0.8
-  // pick the first peak within 0.85 of max (avoids octave errors)
+  if(best<0||bestV<0.55) return -1;
   let lag=peaks.find(p=>nsdf[p]>=bestV*0.85)??best;
-  // parabolic interpolation
   const a=nsdf[lag-1],c=nsdf[lag],d=nsdf[lag+1];
   const shift=(a-d)/(2*(a-2*c+d))||0;
   return sr/(lag+shift);
 }
-
-// ---------- UI loop ----------
-const heardEl=$("heard"),hzEl=$("heardHz"),needle=$("needle"),verdict=$("verdict");
-function render(cents,f,m){
-  if(f<0){
-    heardEl.textContent="…"; heardEl.classList.add("idle"); hzEl.textContent="";
-    verdict.textContent=""; verdict.className="verdict"; needle.style.transform="translateX(0)"; return;
-  }
-  heardEl.classList.remove("idle");
-  const nearest=Math.round(m);
-  heardEl.textContent=midiName(nearest);
-  hzEl.textContent=`${f.toFixed(0)} Hz`;
-  const clamped=Math.max(-100,Math.min(100,cents));
-  needle.style.transform=`translateX(${clamped}px)`;
-  const diff=nearest-target;
-  if(diff===0){verdict.textContent=`Yes — that's ${midiName(target)}`;verdict.className="verdict good"}
-  else{
-    const n=Math.abs(diff);
-    verdict.textContent=`That's ${midiName(nearest)} — ${n} semitone${n===1?"":"s"} ${diff<0?"too low":"too high"}`;
-    verdict.className="verdict bad";
-  }
-}
-
-// smooth the display: median of the last few readings, so the needle doesn't jitter
 const recent=[];
 function smooth(m){
   if(m<0){recent.length=0;return -1}
   recent.push(m); if(recent.length>7) recent.shift();
-  if(recent.length<3) return -1; // ignore the first flicker
+  if(recent.length<3) return -1;
   const s=[...recent].sort((a,b)=>a-b); return s[Math.floor(s.length/2)];
 }
 
+// ---------- judge loop ----------
+const heardEl=$("heard"),needle=$("needle"),verdict=$("verdict");
+const HOLD_MS=800;
 function tick(){
   analyser.getFloatTimeDomainData(buf);
   let rms=0; for(let i=0;i<buf.length;i++) rms+=buf[i]*buf[i]; rms=Math.sqrt(rms/buf.length);
   $("level").style.width=Math.min(100,rms*1200)+"%";
   const raw=detectPitch(buf,audioCtx.sampleRate);
-  const m=smooth(raw>0?hzToMidi(raw):-1);
-  const f=m>0?midiToHz(m):-1;
-  const cents=m>0?(m-target)*100:0;
-  render(cents,f,m);
+  const m=locked?-1:smooth(raw>0?hzToMidi(raw):-1);
   const now=performance.now();
-  if(f>0){
-    if(!cur) cur={start:now,cents:[]};
-    cur.cents.push(cents);
-  }else if(cur){
-    if(now-cur.start>500) scoreAttempt(cur);
-    cur=null;
+  if(m<0){
+    heardEl.textContent="…"; heardEl.classList.add("idle"); verdict.textContent=""; verdict.className="verdict";
+    needle.style.transform="translateX(0)"; holdNote=null; $("hold").style.width="0";
+  }else{
+    const nearest=Math.round(m), cents=(m-target)*100;
+    heardEl.classList.remove("idle"); heardEl.textContent=midiName(nearest);
+    needle.style.transform=`translateX(${Math.max(-100,Math.min(100,cents))}px)`;
+    const diff=nearest-target;
+    if(diff===0){verdict.textContent=t("yes",{n:midiName(target)});verdict.className="verdict good"}
+    else{const k=Math.abs(diff);verdict.textContent=t("wrong",{s:midiName(nearest),k,p:lang==="ru"?ruPlural(k):(k===1?"":"s"),d:t(diff<0?"low":"high")});verdict.className="verdict bad"}
+    if(nearest!==holdNote){holdNote=nearest;holdStart=now}
+    const held=now-holdStart;
+    $("hold").style.width=Math.min(100,100*held/HOLD_MS)+"%";
+    $("hold").style.background=diff===0?"var(--good)":"var(--bad)";
+    if(held>=HOLD_MS){
+      record(nearest);
+      holdNote=null; $("hold").style.width="0"; recent.length=0;
+      if(diff===0){ locked=true; setTimeout(()=>{randomTarget();playTarget()},700); }
+      else{ locked=true; setTimeout(()=>{locked=false},1200); } // pause so one wrong note isn't logged twice
+    }
   }
   raf=requestAnimationFrame(tick);
 }
-
-function scoreAttempt(a){
-  // use the steady second half of the note
-  const half=a.cents.slice(Math.floor(a.cents.length/2));
-  const sorted=[...half].sort((x,y)=>x-y);
-  const med=sorted[Math.floor(sorted.length/2)];
-  const sung=target+Math.round(med/100);
-  attempts.unshift({t:midiName(target),s:midiName(sung),ok:sung===target});
-  attempts=attempts.slice(0,8);
+function record(sung){
+  attempts.unshift({t:target,s:sung,ok:sung===target}); attempts=attempts.slice(0,8);
+  renderLog();
+}
+function renderLog(){
   const tb=$("logBody"); tb.innerHTML="";
   for(const r of attempts){
-    const cls=r.ok?"c-good":"c-bad";
     const tr=document.createElement("tr");
-    tr.innerHTML=`<td>${r.t}</td><td class="${cls}">${r.ok?"✓ correct":"✗ sang "+r.s}</td>`;
+    tr.innerHTML=`<td>${midiName(r.t)}</td><td class="${r.ok?"c-good":"c-bad"}">${r.ok?t("ok"):t("sang",{s:midiName(r.s)})}</td>`;
     tb.appendChild(tr);
   }
   $("stAttempts").textContent=attempts.length;
-  const hits=attempts.filter(r=>r.ok).length;
-  $("stHit").textContent=Math.round(100*hits/attempts.length)+"%";
+  if(!attempts.length){$("stHit").textContent="—";$("stStreak").textContent="—";return}
+  $("stHit").textContent=Math.round(100*attempts.filter(r=>r.ok).length/attempts.length)+"%";
   let streak=0; for(const r of attempts){ if(r.ok) streak++; else break; }
-  $("stAvg").textContent=streak;
+  $("stStreak").textContent=streak;
 }
 
 $("startBtn").onclick=async()=>{
@@ -287,29 +325,24 @@ $("startBtn").onclick=async()=>{
   try{
     ensureCtx();
     stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
-    await audioCtx.resume(); // iOS: context must be running after the stream is granted
+    await audioCtx.resume();
     const src=audioCtx.createMediaStreamSource(stream);
-    analyser=audioCtx.createAnalyser(); analyser.fftSize=2048;
-    buf=new Float32Array(analyser.fftSize);
+    analyser=audioCtx.createAnalyser(); analyser.fftSize=2048; buf=new Float32Array(analyser.fftSize);
     src.connect(analyser);
-    // iOS Safari only pulls audio through nodes that reach the destination; a silent gain keeps it flowing without feedback
-    const mute=audioCtx.createGain(); mute.gain.value=0;
-    analyser.connect(mute).connect(audioCtx.destination);
+    const mute=audioCtx.createGain(); mute.gain.value=0; analyser.connect(mute).connect(audioCtx.destination); // iOS needs a path to the output
     $("startBtn").disabled=true; $("stopBtn").disabled=false;
-    heardEl.textContent="Listening…";
+    heardEl.textContent=t("listening");
+    playTarget();
     tick();
-  }catch(e){
-    $("err").textContent="Microphone unavailable: "+(e.message||e)+". Open this file in Chrome or Safari and allow microphone access.";
-  }
+  }catch(e){ $("err").textContent=t("micErr",{e:e.message||e}); }
 };
 $("stopBtn").onclick=()=>{
   cancelAnimationFrame(raf); raf=null;
-  if(stream) stream.getTracks().forEach(t=>t.stop());
+  if(stream) stream.getTracks().forEach(x=>x.stop());
   $("startBtn").disabled=false; $("stopBtn").disabled=true;
-  heardEl.textContent="Stopped"; heardEl.classList.add("idle"); hzEl.textContent=""; verdict.textContent="";
-  needle.style.transform="translateX(0)";
+  heardEl.textContent=t("stopped"); heardEl.classList.add("idle"); verdict.textContent=""; needle.style.transform="translateX(0)"; $("hold").style.width="0";
 };
-setTarget(60); // start on C4
+applyLang();
 </script>
 </body>
 </html>
