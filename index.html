@@ -82,7 +82,7 @@ select{font:inherit;border-radius:8px;border:1px solid var(--line);background:va
 <div class="wrap">
   <header>
     <h1>Pitch Trainer</h1>
-    <p>Pick a note, hear it, sing it back. The meter shows how far off you are, in cents.</p>
+    <p>Pick a note, hear it, sing it back. The trainer tells you whether you hit the right note.</p>
   </header>
 
   <section class="target">
@@ -113,13 +113,11 @@ select{font:inherit;border-radius:8px;border:1px solid var(--line);background:va
       <svg viewBox="-110 -8 220 56" aria-label="Cents deviation meter">
         <line x1="-100" y1="20" x2="100" y2="20" stroke="var(--line)" stroke-width="2"/>
         <g font-family="IBM Plex Mono, monospace" font-size="8" fill="var(--muted)" text-anchor="middle">
-          <line x1="-100" y1="14" x2="-100" y2="26" stroke="var(--muted)" stroke-width="1"/><text x="-100" y="40">-50</text>
-          <line x1="-50" y1="16" x2="-50" y2="24" stroke="var(--muted)" stroke-width="1"/><text x="-50" y="40">-25</text>
-          <line x1="0" y1="10" x2="0" y2="30" stroke="var(--fg)" stroke-width="1.5"/><text x="0" y="40" fill="var(--fg)">0</text>
-          <line x1="50" y1="16" x2="50" y2="24" stroke="var(--muted)" stroke-width="1"/><text x="50" y="40">+25</text>
-          <line x1="100" y1="14" x2="100" y2="26" stroke="var(--muted)" stroke-width="1"/><text x="100" y="40">+50</text>
+          <line x1="-100" y1="14" x2="-100" y2="26" stroke="var(--muted)" stroke-width="1"/><text x="-100" y="40" id="lblLow">B3</text>
+          <line x1="0" y1="10" x2="0" y2="30" stroke="var(--fg)" stroke-width="1.5"/><text x="0" y="40" fill="var(--fg)" id="lblMid">C4</text>
+          <line x1="100" y1="14" x2="100" y2="26" stroke="var(--muted)" stroke-width="1"/><text x="100" y="40" id="lblHigh">C♯4</text>
         </g>
-        <rect x="-20" y="17" width="40" height="6" fill="var(--good)" opacity=".25"/>
+        <rect x="-50" y="17" width="100" height="6" fill="var(--good)" opacity=".25"/>
         <polygon id="needle" points="0,2 -5,-6 5,-6" fill="var(--accent)" style="transition:transform .08s linear"/>
       </svg>
     </div>
@@ -134,14 +132,14 @@ select{font:inherit;border-radius:8px;border:1px solid var(--line);background:va
 
   <section class="stats">
     <div class="stat"><b id="stAttempts">0</b><span>attempts</span></div>
-    <div class="stat"><b id="stHit">—</b><span>in tune (±10¢)</span></div>
-    <div class="stat"><b id="stAvg">—</b><span>avg error</span></div>
+    <div class="stat"><b id="stHit">—</b><span>correct</span></div>
+    <div class="stat"><b id="stAvg">—</b><span>streak</span></div>
   </section>
 
   <section class="log">
     <div class="eyebrow">Last attempts</div>
     <table><tbody id="logBody"></tbody></table>
-    <p class="hint">v4 · Hold each note for about a second. The attempt is scored on the steady part of the note, not the first wobble. Hit ±10 cents and you're in tune by choir standards.</p>
+    <p class="hint">v5 · Hold each note for about a second. You pass if the note you hold is the right one — anywhere inside the green zone counts. Fine tuning comes later.</p>
   </section>
 </div>
 
@@ -162,6 +160,7 @@ const $=id=>document.getElementById(id);
 function setTarget(m){
   target=m;
   $("targetNote").innerHTML=`${midiName(m)} <small id="targetHz">${midiToHz(m).toFixed(1)} Hz</small>`;
+  $("lblLow").textContent=midiName(m-1); $("lblMid").textContent=midiName(m); $("lblHigh").textContent=midiName(m+1);
 }
 function randomTarget(){
   const [lo,hi]=RANGES[$("rangeSel").value];
@@ -220,23 +219,35 @@ function render(cents,f,m){
   heardEl.classList.remove("idle");
   const nearest=Math.round(m);
   heardEl.textContent=midiName(nearest);
-  hzEl.textContent=`${f.toFixed(1)} Hz · ${cents>0?"+":""}${cents.toFixed(0)}¢ vs ${midiName(target)}`;
-  const clamped=Math.max(-50,Math.min(50,cents));
-  needle.style.transform=`translateX(${clamped*2}px)`;
-  const ac=Math.abs(cents);
-  if(ac<=10){verdict.textContent="In tune";verdict.className="verdict good"}
-  else if(ac<=25){verdict.textContent=(cents<0?"A little flat":"A little sharp");verdict.className="verdict warn"}
-  else if(ac<=100){verdict.textContent=(cents<0?"Flat":"Sharp");verdict.className="verdict bad"}
-  else{verdict.textContent=`Wrong note — that's ${midiName(nearest)}, ${Math.abs(nearest-target)} semitone${Math.abs(nearest-target)===1?"":"s"} ${nearest<target?"below":"above"}`;verdict.className="verdict bad"}
+  hzEl.textContent=`${f.toFixed(0)} Hz`;
+  const clamped=Math.max(-100,Math.min(100,cents));
+  needle.style.transform=`translateX(${clamped}px)`;
+  const diff=nearest-target;
+  if(diff===0){verdict.textContent=`Yes — that's ${midiName(target)}`;verdict.className="verdict good"}
+  else{
+    const n=Math.abs(diff);
+    verdict.textContent=`That's ${midiName(nearest)} — ${n} semitone${n===1?"":"s"} ${diff<0?"too low":"too high"}`;
+    verdict.className="verdict bad";
+  }
+}
+
+// smooth the display: median of the last few readings, so the needle doesn't jitter
+const recent=[];
+function smooth(m){
+  if(m<0){recent.length=0;return -1}
+  recent.push(m); if(recent.length>7) recent.shift();
+  if(recent.length<3) return -1; // ignore the first flicker
+  const s=[...recent].sort((a,b)=>a-b); return s[Math.floor(s.length/2)];
 }
 
 function tick(){
   analyser.getFloatTimeDomainData(buf);
   let rms=0; for(let i=0;i<buf.length;i++) rms+=buf[i]*buf[i]; rms=Math.sqrt(rms/buf.length);
   $("level").style.width=Math.min(100,rms*1200)+"%";
-  const f=detectPitch(buf,audioCtx.sampleRate);
-  let cents=0,m=0;
-  if(f>0){m=hzToMidi(f); cents=(m-target)*100;}
+  const raw=detectPitch(buf,audioCtx.sampleRate);
+  const m=smooth(raw>0?hzToMidi(raw):-1);
+  const f=m>0?midiToHz(m):-1;
+  const cents=m>0?(m-target)*100:0;
   render(cents,f,m);
   const now=performance.now();
   if(f>0){
@@ -254,19 +265,21 @@ function scoreAttempt(a){
   const half=a.cents.slice(Math.floor(a.cents.length/2));
   const sorted=[...half].sort((x,y)=>x-y);
   const med=sorted[Math.floor(sorted.length/2)];
-  attempts.unshift({t:midiName(target),c:med});
+  const sung=target+Math.round(med/100);
+  attempts.unshift({t:midiName(target),s:midiName(sung),ok:sung===target});
   attempts=attempts.slice(0,8);
   const tb=$("logBody"); tb.innerHTML="";
   for(const r of attempts){
-    const ac=Math.abs(r.c), cls=ac<=10?"c-good":ac<=25?"c-warn":"c-bad";
+    const cls=r.ok?"c-good":"c-bad";
     const tr=document.createElement("tr");
-    tr.innerHTML=`<td>${r.t}</td><td class="${cls}">${ac<=10?"in tune":ac<=100?(r.c<0?"flat":"sharp"):"wrong note"}</td><td class="${cls}">${r.c>0?"+":""}${r.c.toFixed(0)}¢</td>`;
+    tr.innerHTML=`<td>${r.t}</td><td class="${cls}">${r.ok?"✓ correct":"✗ sang "+r.s}</td>`;
     tb.appendChild(tr);
   }
   $("stAttempts").textContent=attempts.length;
-  const hits=attempts.filter(r=>Math.abs(r.c)<=10).length;
+  const hits=attempts.filter(r=>r.ok).length;
   $("stHit").textContent=Math.round(100*hits/attempts.length)+"%";
-  $("stAvg").textContent=(attempts.reduce((s,r)=>s+Math.abs(r.c),0)/attempts.length).toFixed(0)+"¢";
+  let streak=0; for(const r of attempts){ if(r.ok) streak++; else break; }
+  $("stAvg").textContent=streak;
 }
 
 $("startBtn").onclick=async()=>{
