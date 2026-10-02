@@ -58,6 +58,8 @@ select{font:inherit;border-radius:8px;border:1px solid var(--line);background:va
 .meter{width:100%;max-width:100%;margin-top:6px}
 .meter svg{width:100%;height:auto;display:block;overflow:visible}
 .verdict{font-weight:600;min-height:1.5em;text-align:center}
+.levelbar{width:60%;max-width:100%;height:4px;background:var(--line);border-radius:2px;overflow:hidden}
+.levelbar div{height:100%;width:0;background:var(--accent);transition:width .05s linear}
 .verdict.good{color:var(--good)}.verdict.warn{color:var(--warn)}.verdict.bad{color:var(--bad)}
 
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
@@ -121,6 +123,7 @@ select{font:inherit;border-radius:8px;border:1px solid var(--line);background:va
       </svg>
     </div>
     <div class="verdict" id="verdict"></div>
+    <div class="levelbar" title="Microphone level"><div id="level"></div></div>
     <div class="controls">
       <button class="primary" id="startBtn" type="button">Start microphone</button>
       <button id="stopBtn" type="button" disabled>Stop</button>
@@ -181,7 +184,7 @@ $("playBtn").onclick=()=>{
 // ---------- pitch detection (autocorrelation, McLeod-style normalisation) ----------
 function detectPitch(b,sr){
   let rms=0; for(let i=0;i<b.length;i++) rms+=b[i]*b[i]; rms=Math.sqrt(rms/b.length);
-  if(rms<0.01) return -1; // silence
+  if(rms<0.004) return -1; // silence (low threshold: phone mics with AGC off are quiet)
   const N=b.length, maxLag=Math.floor(sr/60), minLag=Math.floor(sr/1200);
   const nsdf=new Float32Array(maxLag);
   for(let lag=minLag;lag<maxLag;lag++){
@@ -228,6 +231,8 @@ function render(cents,f,m){
 
 function tick(){
   analyser.getFloatTimeDomainData(buf);
+  let rms=0; for(let i=0;i<buf.length;i++) rms+=buf[i]*buf[i]; rms=Math.sqrt(rms/buf.length);
+  $("level").style.width=Math.min(100,rms*400)+"%";
   const f=detectPitch(buf,audioCtx.sampleRate);
   let cents=0,m=0;
   if(f>0){m=hzToMidi(f); cents=(m-target)*100;}
@@ -268,10 +273,14 @@ $("startBtn").onclick=async()=>{
   try{
     ensureCtx();
     stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+    await audioCtx.resume(); // iOS: context must be running after the stream is granted
     const src=audioCtx.createMediaStreamSource(stream);
     analyser=audioCtx.createAnalyser(); analyser.fftSize=2048;
     buf=new Float32Array(analyser.fftSize);
     src.connect(analyser);
+    // iOS Safari only pulls audio through nodes that reach the destination; a silent gain keeps it flowing without feedback
+    const mute=audioCtx.createGain(); mute.gain.value=0;
+    analyser.connect(mute).connect(audioCtx.destination);
     $("startBtn").disabled=true; $("stopBtn").disabled=false;
     heardEl.textContent="Listening…";
     tick();
