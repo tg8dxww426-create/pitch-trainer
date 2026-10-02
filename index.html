@@ -97,9 +97,10 @@ select{font:inherit;border-radius:8px;border:1px solid var(--line);background:va
     <div class="target-row">
       <label class="hint" for="rangeSel">Range</label>
       <select id="rangeSel">
-        <option value="low">Low voice (G2–G4)</option>
-        <option value="mid" selected>Mid voice (C3–C5)</option>
-        <option value="high">High voice (G3–G5)</option>
+        <option value="oct4" selected>Octave 4 (C4–B4)</option>
+        <option value="oct3">Octave 3 (C3–B3)</option>
+        <option value="oct5">Octave 5 (C5–B5)</option>
+        <option value="mid">Two octaves (C3–C5)</option>
       </select>
     </div>
   </section>
@@ -140,7 +141,7 @@ select{font:inherit;border-radius:8px;border:1px solid var(--line);background:va
   <section class="log">
     <div class="eyebrow">Last attempts</div>
     <table><tbody id="logBody"></tbody></table>
-    <p class="hint">v3 · Hold each note for about a second. The attempt is scored on the steady part of the note, not the first wobble. Hit ±10 cents and you're in tune by choir standards.</p>
+    <p class="hint">v4 · Hold each note for about a second. The attempt is scored on the steady part of the note, not the first wobble. Hit ±10 cents and you're in tune by choir standards.</p>
   </section>
 </div>
 
@@ -151,7 +152,7 @@ NAMES[5]="F";
 function midiToHz(m){return 440*Math.pow(2,(m-69)/12)}
 function hzToMidi(f){return 69+12*Math.log2(f/440)}
 function midiName(m){return NAMES[((m%12)+12)%12]+(Math.floor(m/12)-1)}
-const RANGES={low:[43,67],mid:[48,72],high:[55,79]};
+const RANGES={oct4:[60,71],oct3:[48,59],oct5:[72,83],mid:[48,72]};
 
 // ---------- state ----------
 let target=69, audioCtx=null, analyser=null, stream=null, raf=null;
@@ -295,7 +296,7 @@ $("stopBtn").onclick=()=>{
   heardEl.textContent="Stopped"; heardEl.classList.add("idle"); hzEl.textContent=""; verdict.textContent="";
   needle.style.transform="translateX(0)";
 };
-setTarget(69);
+setTarget(60); // start on C4
 </script>
 </body>
 </html>
